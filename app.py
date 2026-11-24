@@ -13,7 +13,7 @@ def home():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "broken"}), 200
+    return jsonify({"status": "ok"}), 200
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
