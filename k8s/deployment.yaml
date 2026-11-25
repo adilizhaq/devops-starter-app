@@ -14,10 +14,18 @@ spec:
     spec:
       containers:
         - name: web
-          image: devops-starter-app:v1
-          imagePullPolicy: IfNotPresent
+          # Same image the CI pipeline pushes; CI pins the commit SHA on deploy
+          image: ghcr.io/adilizhaq/devops-starter-app:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
           readinessProbe:
             httpGet:
               path: /health

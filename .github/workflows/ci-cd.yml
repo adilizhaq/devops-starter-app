@@ -6,9 +6,12 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Least privilege by default; jobs that need more declare it themselves
 permissions:
   contents: read
-  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/devops-starter-app
 
 jobs:
   test:
@@ -21,9 +24,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Run unit tests
         run: pytest
@@ -32,6 +37,9 @@ jobs:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -49,5 +57,30 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/devops-starter-app:latest
-            ghcr.io/${{ github.repository_owner }}/devops-starter-app:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    # Opt-in: set repository variable DEPLOY_ENABLED=true and secret KUBE_CONFIG
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Apply manifests
+        run: kubectl apply -f k8s/
+
+      - name: Roll out the image built for this commit
+        run: |
+          kubectl set image deployment/devops-app web=${{ env.IMAGE }}:${{ github.sha }}
+          kubectl rollout status deployment/devops-app --timeout=120s

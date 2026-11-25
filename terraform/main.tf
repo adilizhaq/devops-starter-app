@@ -15,8 +15,14 @@ variable "app_port" {
   default     = 5000
 }
 
+variable "image" {
+  description = "Image to run (the one the CI pipeline pushes to GHCR)"
+  type        = string
+  default     = "ghcr.io/adilizhaq/devops-starter-app:latest"
+}
+
 resource "docker_image" "app" {
-  name         = "devops-starter-app:v1"
+  name         = var.image
   keep_locally = true
 }
 
